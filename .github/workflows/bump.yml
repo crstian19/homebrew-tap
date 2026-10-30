@@ -1,0 +1,54 @@
+name: Bump casks
+
+# Every day, checks each app's latest GitHub release and opens a PR that
+# bumps its cask (version and sha256) when there is a newer one.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: ${{ matrix.cask }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cask: herakleo
+            repo: crstian19/herakleo
+            asset: "herakleo-{version}-macos-universal.dmg"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Bump
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CASK: ${{ matrix.cask }}
+          REPO: ${{ matrix.repo }}
+          ASSET: ${{ matrix.asset }}
+        run: |
+          file="Casks/$CASK.rb"
+          latest=$(gh api "repos/$REPO/releases/latest" -q .tag_name)
+          latest=${latest#v}
+          current=$(sed -n 's/^  version "\(.*\)"/\1/p' "$file")
+          if [ "$latest" = "$current" ] || [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -1)" != "$latest" ]; then
+            echo "$CASK is up to date ($current)"; exit 0
+          fi
+          branch="bump-$CASK-$latest"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "$branch already open"; exit 0
+          fi
+          asset=${ASSET//\{version\}/$latest}
+          curl -fsSL -o "$RUNNER_TEMP/asset" "https://github.com/$REPO/releases/download/v$latest/$asset"
+          sha=$(sha256sum "$RUNNER_TEMP/asset" | cut -d' ' -f1)
+          sed -i "s/^  version \".*\"/  version \"$latest\"/; s/^  sha256 \".*\"/  sha256 \"$sha\"/" "$file"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "chore: bump $CASK to $latest"
+          git push -u origin "$branch"
+          gh pr create --title "chore: bump $CASK to $latest" --body "Automated bump of \`$CASK\` from $current to $latest."
