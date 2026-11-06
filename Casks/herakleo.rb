@@ -1,6 +1,6 @@
 cask "herakleo" do
-  version "0.4.1"
-  sha256 "5322cf761d5e6f7ffeb5b3a84e5aa94c6ffeae2f1f446eccab7bca8562e03345"
+  version "0.4.2"
+  sha256 "d81bd8e3349e5900cc3b4098be418c098e40e0a53b0e84ee13dc476b33ef3318"
 
   url "https://github.com/crstian19/herakleo/releases/download/v#{version}/herakleo-#{version}-macos-universal.dmg"
   name "Herakleo"
